@@ -7,7 +7,14 @@ OEM-Archiver\
 +-- OEM-Archive-9x.bat       Windows 95/98/98SE/ME edition (plain batch)
 +-- OEM-Archive-NT5.js       Windows 2000/XP/2003 edition (JScript, built from src\)
 +-- OEM-Archive-NT6.js       Windows Vista-11 edition (JScript, built from src\)
-+-- README.txt               usage, switches, privacy, limits
++-- README.md                GitHub README: quick start, version table, flags, baseline summary
++-- README.txt               short plain-text README for old Windows
++-- CHANGELOG.md             what changed
++-- PLAN-next.txt            outline of remaining features
++-- docs\
+|   +-- SWITCHES.md          every flag with examples
+|   +-- BASELINE.md          install-media check and reference sheets
+|   \-- DEVELOPMENT.md       building, tests, code rules
 +-- STRUCTURE.txt            this file
 +-- build.ps1                dev only: builds the two .js files from src\, fixes line endings
 +-- src\
