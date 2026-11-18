@@ -64,7 +64,7 @@ PROGRESS, DRY RUN, RESUME, PACKAGING
   the folder in Explorer (/open). The built-in zip is slow and Windows zip cannot hold files over 4 GB.
 
 NOTICE
-  For best results run on a fresh, factory-state install of the OEM image.
+  For best results run on a fresh or recently installed copy of the OEM image.
   Planned media options (verify against a disc, back up recovery media; see PLAN-next.txt) will show a
   warning when chosen: the media MUST be the same Windows edition AND build; use the disc that came with
   the PC if you have it.

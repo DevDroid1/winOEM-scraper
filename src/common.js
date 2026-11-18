@@ -397,6 +397,8 @@ OA.probeSystem = function () {
   P.model = OA.cleanModel(P.modelRaw, P.maker);
   for (i = 0; i < OAV.vendors.length; i++) { if (OAV.vendors[i].rx.test(P.makerRaw || '') || OAV.vendors[i].s === P.maker) { OA.vendorRx = OAV.vendors[i].rx; OA.vendorShort = OAV.vendors[i].s; break; } }
   if (!OA.vendorRx && P.maker) { OA.vendorRx = new RegExp('\\b' + OA.escRx(P.maker) + '\\b', 'i'); OA.vendorShort = P.maker; }
+  P.microsoftOem = false;
+  if (OA.vendorShort === 'Microsoft') { OA.vendorRx = null; OA.vendorShort = ''; P.microsoftOem = true; }   // Surface etc.: Microsoft is both OS vendor and OEM; publisher matching would flag everything
 
   // reference time: end of OOBE / first-user setup ("Factory" = before this, "Post" = after)
   P.oobeEnd = null; P.oobeSrc = '';
@@ -718,7 +720,10 @@ OA.stockCheck5 = function (path) {
   if (sn && OA._layout[sn]) { return { oem: false, why: 'listed in layout.inf / dllcache (8.3 name)' }; }
   return { oem: true, conf: 'MED', why: 'not listed in layout.inf [SourceDisksFiles] and not in dllcache' };
 };
-OA.stockCheck = function (path) { return (OA.profile.family === 'NT6') ? OA.stockCheck6(path) : OA.stockCheck5(path); };
+OA.stockCheck = function (path) {
+  if (OA.base && OA.base.active) { return OA.stockCheckBaseline(path); }
+  return (OA.profile.family === 'NT6') ? OA.stockCheck6(path) : OA.stockCheck5(path);
+};
 
 // Scan a Windows-owned folder and add every file that does not look stock.
 // opts: flat (no recursion), rx (name filter), why (prefix), sub, skipRx (names to ignore)
@@ -1022,6 +1027,7 @@ OA.buildTranscript = function (root) {
   L.push('ProductId      : ' + P.productId + '   channel: ' + P.channel);
   L.push('OOBE finished  : ' + (P.oobeEnd ? OA.fmtDate(P.oobeEnd) + '  (source: ' + P.oobeSrc + ')' : 'unknown - Factory/Post tags unavailable'));
   L.push('Selection      : ' + OA.modeText());
+  L.push('Baseline       : ' + ((OA.base && OA.base.active) ? OA.base.summary : 'none (heuristics only)'));
   if (OA.resuming) { L.push('Run type       : RESUMED - files already present with the same size were kept'); }
   L.push('');
   L.push('Legend: [HIGH|MED|LOW] = how sure the script is that the item is OEM-specific.');
@@ -1090,10 +1096,10 @@ OA.buildManifest = function () {
   return L.join('\r\n');
 };
 OA.buildDriverManifest = function () {
-  var L = [OA.csvRow(['published_inf', 'original_inf', 'provider', 'class', 'driver_ver', 'created', 'era', 'oem_vendor_match', 'package_folder', 'size_bytes', 'copied'])], i, r;
+  var L = [OA.csvRow(['published_inf', 'original_inf', 'provider', 'class', 'driver_ver', 'created', 'era', 'oem_vendor_match', 'baseline', 'package_folder', 'size_bytes', 'copied'])], i, r;
   for (i = 0; i < OA.drivers.length; i++) {
     r = OA.drivers[i];
-    L.push(OA.csvRow([r.pub, r.orig, r.provider, r.cls, r.ver, OA.fmtDate(r.created), r.era, r.vendor, r.folder, r.size, (r.item && (r.item.status === 'copied' || r.item.status === 'partial')) ? 'yes' : 'no']));
+    L.push(OA.csvRow([r.pub, r.orig, r.provider, r.cls, r.ver, OA.fmtDate(r.created), r.era, r.vendor, r.baseline || '', r.folder, r.size, (r.item && (r.item.status === 'copied' || r.item.status === 'partial')) ? 'yes' : 'no']));
   }
   return L.join('\r\n');
 };
@@ -1123,6 +1129,8 @@ OA.buildProfile = function (root) {
   L.push('Tools          : ' + t.join(' '));
   L.push('Script         : OEM-Archiver ' + OA.version + ' (' + P.family + ')');
   L.push('Selection      : ' + OA.modeText());
+  L.push('Baseline       : ' + ((OA.base && OA.base.active) ? OA.base.summary + '  (media file: ' + OA.base.src + ')' : 'none (heuristics only)'));
+  if (P.microsoftOem) { L.push('Note           : Microsoft device - publisher-based OEM detection is disabled (planned: dedicated handling)'); }
   L.push('Archive folder : ' + root);
   if (OA.sensitive.length) {
     L.push(''); L.push('COPIED ANSWER/SETUP FILES THAT MAY CONTAIN PRODUCT KEYS OR PASSWORDS (handle the archive accordingly):');
@@ -1368,7 +1376,7 @@ OA.addDesktopItems = function (dir, label) {
 // ---------- startup advice ----------
 OA.recommendations = function () {
   OA.say('');
-  OA.say('NOTICE: for best results, run this on a FRESH, factory-state install of the OEM image');
+  OA.say('NOTICE: for best results, run this on a FRESH or recently installed copy of the OEM image');
   OA.say('        (before the PC is used heavily, updated, or has other software installed).');
   OA.say('        On a used system more items show up as "post-delivery" and some OEM files may');
   OA.say('        already have been replaced or removed.');
@@ -1507,6 +1515,7 @@ OA.tuiHeader = function (S) {
   OA.say(' OEM-Archiver ' + OA.version + '   ' + (P.makerRaw || '?') + ' / ' + (P.modelRaw || '?') + '   ' + P.winName + (P.winSuffix ? ' ' + P.winSuffix : ''));
   OA.say(OA.rep('-', 70));
   OA.say(' Name     : ' + S.name);
+  OA.say(' Baseline : ' + ((OA.base && OA.base.active) ? OA.base.summary : 'none (heuristics only)'));
   OA.say(' Location : ' + (S.base ? S.base : '(not chosen yet)'));
   if (root) { OA.say(' Archive  : ' + root); }
   if (S.scanned) {
@@ -1527,15 +1536,20 @@ OA.tuiScan = function (S, collectors) {
   S.scanned = true;
 };
 OA.runTui = function (collectors) {
-  var S = { name: (OA.args.name && OA.args.name !== true) ? (OA.safeName(OA.args.name, 100) || OA.nameOptions()[0].value) : OA.nameOptions()[0].value, base: (OA.args.out && OA.args.out !== true) ? OA.args.out : '', scanned: false, presetSet: false }, c, def, labels, est, i, idx, root, free;
+  var S = { name: (OA.args.name && OA.args.name !== true) ? (OA.safeName(OA.args.name, 100) || OA.nameOptions()[0].value) : OA.nameOptions()[0].value, base: (OA.args.out && OA.args.out !== true) ? OA.args.out : '', scanned: false, presetSet: false }, c, src, def, labels, est, i, idx, root, free;
   while (true) {
     OA.tuiHeader(S);
-    def = !S.base ? 1 : (!S.scanned ? 2 : (!S.presetSet ? 3 : 6));
-    c = OA.menu('Main menu', ['Name', 'Location', 'Scan this PC', 'Preset (what to copy)', 'Adjust (branding / drivers / software / limits)', 'Dry run (show what would be copied)', 'Start copy', 'Quit'], def);
+    def = !S.base ? 1 : (!S.scanned ? 2 : (!S.presetSet ? 3 : 7));
+    c = OA.menu('Main menu', ['Name', 'Location', 'Scan this PC', 'Preset (what to copy)', 'Adjust (branding / drivers / software / limits)', 'Baseline (verify against Windows install media)', 'Dry run (show what would be copied)', 'Start copy', 'Quit'], def);
     if (c === 0) { S.name = OA.chooseName(); if (S.scanned && S.base) { OA.excludeRoot = OA.lc(OA.resolveArchiveRoot(S.base, S.name)); } continue; }
     if (c === 1) { S.base = OA.chooseLocation(); continue; }
-    if (c === 7) { OA.say('Quit. Nothing was copied.'); OA.finish(0); }
+    if (c === 8) { OA.say('Quit. Nothing was copied.'); OA.finish(0); }
     if (c === 2) { OA.tuiScan(S, collectors); continue; }
+    if (c === 5) {
+      src = OA.ask('Path to the ISO or install.wim, or the drive letter of mounted media (blank = cancel)', '');
+      if (src && OA.setupBaseline(src)) { S.scanned = false; OA.say('  Baseline ready. Run the scan again (option 3) so it uses the baseline.'); }
+      continue;
+    }
     if (!S.scanned) { OA.say('  Scanning first (needed for sizes and choices)...'); OA.tuiScan(S, collectors); }
     free = S.base ? OA.freeSpace(S.base) : -1;
     if (c === 3) {
@@ -1547,8 +1561,8 @@ OA.runTui = function (collectors) {
       continue;
     }
     if (c === 4) { OA.adjustPages(); S.presetSet = true; continue; }
-    if (c === 5) { OA.dryRunReport(); OA.ask('Press Enter to return to the menu', ''); continue; }
-    if (c === 6) {
+    if (c === 6) { OA.dryRunReport(); OA.ask('Press Enter to return to the menu', ''); continue; }
+    if (c === 7) {
       if (!S.base) { OA.say('  Choose a location first (option 2).'); continue; }
       root = OA.resolveArchiveRoot(S.base, S.name);
       if (OA.dirExists(root)) {
@@ -1560,6 +1574,202 @@ OA.runTui = function (collectors) {
       if (OA.yesno('Start copying now?', true)) { return { root: root, base: S.base }; }
     }
   }
+};
+// ---------- baseline: verify against Windows install media ----------
+// Reads the stock file list and inbox driver list from a Windows install image (install.wim), after checking that
+// the media matches this PC's build. Comparison is by path and size (no hashes).
+OA.base = null;      // { active, degraded, level, summary, files: {rel: size}, infs: {name: true} }
+OA.mount = null;
+OA.baseConf = function (c) {
+  if (OA.base && OA.base.degraded) { return c === 'HIGH' ? 'MED' : 'LOW'; }
+  return c;
+};
+OA.findTool = function (exe, dirs) {
+  var P = OA.profile, i, j, p, v, bases = [P.progFiles, P.progFiles86];
+  v = OA.regStr('HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\' + exe + '\\').replace(/"/g, '');
+  if (v && OA.fileExists(v)) { return v; }
+  for (j = 0; j < bases.length; j++) {
+    if (!bases[j]) { continue; }
+    for (i = 0; i < dirs.length; i++) { p = bases[j] + '\\' + dirs[i] + '\\' + exe; if (OA.fileExists(p)) { return p; } }
+  }
+  return '';
+};
+OA.mediaTools = function () {
+  var P = OA.profile;
+  return {
+    native: (P.build >= 9200 && OA.fileExists(P.sys32 + '\\WindowsPowerShell\\v1.0\\powershell.exe')),
+    dt: OA.findTool('DTAgent.exe', ['DAEMON Tools Lite', 'DAEMON Tools Ultra', 'DAEMON Tools Pro', 'DAEMON Tools Lite 10']),
+    imgburn: OA.findTool('ImgBurn.exe', ['ImgBurn'])
+  };
+};
+OA.cdDrives = function () {
+  var out = {}, e, d;
+  try { for (e = new Enumerator(OA.fso.Drives); !e.atEnd(); e.moveNext()) { d = e.item(); try { if (d.DriveType === 4 && d.IsReady) { out[d.DriveLetter.toUpperCase()] = true; } } catch (x) { } } } catch (x2) { }
+  return out;
+};
+OA.mountIso = function (iso, tools) {
+  var r, lines, last, before, after, t, k;
+  if (tools.native) {
+    r = OA.exec('powershell -NoProfile -ExecutionPolicy Bypass -Command "(Mount-DiskImage -ImagePath \'' + iso.replace(/'/g, "''") + '\' -PassThru | Get-Volume).DriveLetter"');
+    lines = r.out.split('\n'); last = '';
+    for (t = lines.length - 1; t >= 0; t--) { if (OA.trim(lines[t]) !== '') { last = OA.trim(lines[t]); break; } }
+    if (/^[A-Za-z]$/.test(last)) { OA.mount = { how: 'native', iso: iso }; return last.toUpperCase() + ':\\'; }
+  }
+  if (tools.dt) {
+    before = OA.cdDrives();
+    OA.exec('"' + tools.dt + '" -mount ide, 0, "' + iso + '"');
+    for (t = 0; t < 20; t++) {
+      WScript.Sleep(1000);
+      after = OA.cdDrives();
+      for (k in after) { if (!before[k]) { OA.mount = { how: 'dt', iso: iso, dt: tools.dt }; return k + ':\\'; } }
+    }
+  }
+  return '';
+};
+OA.unmountIso = function () {
+  if (!OA.mount) { return; }
+  if (OA.mount.how === 'native') { OA.exec('powershell -NoProfile -ExecutionPolicy Bypass -Command "Dismount-DiskImage -ImagePath \'' + OA.mount.iso.replace(/'/g, "''") + '\'"'); }
+  else if (OA.mount.how === 'dt') { OA.exec('"' + OA.mount.dt + '" -unmount ide, 0'); }
+  OA.mount = null;
+};
+OA.dismKv = function (text) {
+  var lines = String(text).split('\n'), i, m, kv = {};
+  for (i = 0; i < lines.length; i++) {
+    m = /^\s*([A-Za-z][A-Za-z ]*?)\s*:\s*(.*?)\s*$/.exec(lines[i]);
+    if (m && kv[OA.lc(m[1])] === undefined) { kv[OA.lc(m[1])] = m[2]; }
+  }
+  return kv;
+};
+OA.wimIndexes = function (wim) {
+  var r = OA.exec('dism /English /Get-WimInfo /WimFile:"' + wim + '"'), re = /Index\s*:\s*(\d+)/g, m, ids = [], out = [], i, d, kv;
+  while ((m = re.exec(r.out)) !== null) { ids.push(parseInt(m[1], 10)); }
+  for (i = 0; i < ids.length; i++) {
+    d = OA.exec('dism /English /Get-WimInfo /WimFile:"' + wim + '" /Index:' + ids[i]);
+    kv = OA.dismKv(d.out);
+    out.push({ index: ids[i], name: kv.name || '', version: kv.version || '', ubr: parseInt(kv['servicepack build'], 10), edition: kv.edition || '', arch: OA.lc(kv.architecture || '') });
+  }
+  return out;
+};
+// Compare the media images with this PC. Returns { idx, level: exact|revision|edition|build|arch, mediaText, installedText, verdict, consequence }
+OA.compareWim = function (list) {
+  var P = OA.profile, key = 'HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\', ub = parseInt(OA.regRead(key + 'UBR'), 10), ed = OA.lc(OA.regStr(key + 'EditionID')),
+      a = OA.lc(P.arch), arch = (a === 'amd64') ? 'x64' : (a === 'x86' ? 'x86' : a), inst = P.major + '.' + P.minor + '.' + P.build, i, pick = null, arches = [], r = { idx: 0, level: 'exact' }, vp, mb;
+  for (i = 0; i < list.length; i++) { if (list[i].arch === arch) { arches.push(list[i]); } }
+  r.installedText = P.osCaption + ', version ' + inst + (isNaN(ub) ? '' : '.' + ub) + ', edition ' + (ed || '?') + ', ' + arch;
+  if (!arches.length) {
+    r.level = 'arch'; r.idx = list.length ? list[0].index : 0;
+    r.mediaText = list.length ? list[0].name + ' ' + list[0].version + ' ' + list[0].arch : 'no images found';
+    r.verdict = 'The media is for a different processor architecture (' + (list.length ? list[0].arch : '?') + ' vs ' + arch + ').';
+    r.consequence = 'Nothing would match. The baseline check is refused.';
+    return r;
+  }
+  for (i = 0; i < arches.length; i++) { if (OA.lc(arches[i].edition) === ed) { pick = arches[i]; break; } }
+  if (!pick) { pick = arches[0]; }
+  r.idx = pick.index;
+  r.mediaText = pick.name + ', version ' + pick.version + (isNaN(pick.ubr) ? '' : '.' + pick.ubr) + ', edition ' + pick.edition + ', ' + pick.arch;
+  vp = pick.version.split('.'); mb = vp[0] + '.' + vp[1] + '.' + vp[2];
+  if (mb !== inst) {
+    r.level = 'build';
+    r.verdict = 'DIFFERENT BUILD: media ' + mb + ' vs this PC ' + inst + '.';
+    r.consequence = 'Windows changes many files and drivers between builds. Stock files that changed will look like OEM replacements, drivers added in a newer build will look "not on media", and real OEM changes can be hidden. Every result from this check is marked one confidence level lower. You should use media of the same build (best: the disc that came with the PC).';
+  } else if (P.major >= 10 && !isNaN(ub) && !isNaN(pick.ubr) && ub !== pick.ubr) {
+    r.level = 'revision';
+    r.verdict = 'Same build (' + inst + ') but different update revision: media .' + pick.ubr + ' vs this PC .' + ub + '.';
+    r.consequence = 'Files serviced by cumulative updates will have different sizes. They are treated as "updated stock" when Windows owns them, so the effect is small, but a few updated files may be reported wrongly.';
+  } else if (OA.lc(pick.edition) !== ed && ed) {
+    r.level = 'edition';
+    r.verdict = 'Same build, different edition: media ' + pick.edition + ' vs this PC ' + ed + '.';
+    r.consequence = 'Editions share most files; a few edition-specific components differ, so some items may be reported as "not on media" when they are normal for your edition.';
+  } else { r.verdict = 'Exact match: same build, edition and architecture.'; r.consequence = ''; }
+  return r;
+};
+OA.loadBaseline = function (mnt, cmp, src) {
+  var w = mnt + '\\Windows', n = (w + '\\').length, dirs = ['Web\\Wallpaper', 'Web\\4K', 'Web\\Screen', 'Media', 'Cursors', 'Resources'], i, subs, m, cnt = 0;
+  OA.base = { active: true, degraded: (cmp.level === 'build'), level: cmp.level, files: {}, infs: {}, src: src, summary: '' };
+  function add(f) { OA.base.files[OA.lc(f.Path.substr(n))] = f.Size; cnt++; }
+  for (i = 0; i < dirs.length; i++) { if (OA.dirExists(w + '\\' + dirs[i])) { OA.walkFiles(w + '\\' + dirs[i], true, add); } }
+  OA.walkFiles(w + '\\System32', false, function (f) { if (/\.scr$/i.test(f.Name)) { add(f); } });
+  OA.walkFiles(w + '\\INF', false, function (f) { if (/\.inf$/i.test(f.Name)) { OA.base.infs[OA.lc(f.Name)] = true; } });
+  subs = OA.subDirs(w + '\\System32\\DriverStore\\FileRepository');
+  for (i = 0; i < subs.length; i++) { m = /^(.+\.inf)_[^_]+_[0-9a-f]{16}$/i.exec(subs[i].Name); if (m) { OA.base.infs[OA.lc(m[1])] = true; } }
+  OA.base.count = cnt;
+  OA.base.summary = 'media ' + cmp.mediaText + ' [' + cmp.level + (OA.base.degraded ? ', confidence lowered' : '') + '], ' + cnt + ' reference files';
+};
+// stock test with the baseline: path + size on the media decide; Windows ownership explains updates
+OA.stockCheckBaseline = function (path) {
+  var P = OA.profile, r0 = OA.stockCheck6(path), rel = null, size = -1, mbase, w = P.windir + '\\', sfx = OA.base.degraded ? ' (media build differs)' : '';
+  if (OA.lc(path).indexOf(OA.lc(w)) === 0) { rel = OA.lc(path.substr(w.length)); }
+  try { size = OA.fso.GetFile(path).Size; } catch (e) { }
+  if (rel !== null) { mbase = OA.base.files[rel]; }
+  if (rel !== null && mbase !== undefined) {
+    if (mbase === size && !OA.base.degraded) { return { oem: false, why: 'identical path and size on the install media' }; }
+    if (mbase === size) { return { oem: false, why: 'same path and size as the install media' + sfx }; }
+    if (!r0.oem) { return { oem: false, why: r0.why + '; size differs from the media (updated by Windows)' + sfx }; }
+    return { oem: true, conf: OA.baseConf('HIGH'), why: 'path exists on the install media but the size differs and Windows does not own it: replaced by the OEM' + sfx };
+  }
+  if (!r0.oem) { return { oem: false, why: r0.why + '; not on the media (added by a later update)' + sfx }; }
+  return { oem: true, conf: OA.baseConf('HIGH'), why: 'not on the install media and not owned by Windows' + sfx };
+};
+OA.setupBaseline = function (src) {
+  var P = OA.profile, tools, root = '', wim = '', list, cmp, go, mnt, r, iso = '', i, cleaned = false;
+  OA.base = null;
+  OA.say(''); OA.say('--- Baseline check against install media ---');
+  if (P.family !== 'NT6') { OA.say('  The baseline check is available for Windows Vista and newer only.'); return false; }
+  if (!OA.mediaWarning()) { OA.say('  Baseline check cancelled.'); return false; }
+  if (!P.tools.dism) { OA.say('  DISM was not found; it is needed to read install.wim.'); return false; }
+  if (!P.admin) { OA.say('  The baseline check needs administrator rights (DISM mounts the image). Restart as administrator.'); return false; }
+  tools = OA.mediaTools();
+  OA.say('  Tools: Windows ISO mount ' + (tools.native ? 'yes' : 'no') + ' | Daemon Tools ' + (tools.dt ? 'found' : 'not found') + ' | ImgBurn ' + (tools.imgburn ? 'found' : 'not found'));
+  src = OA.trim(String(src)).replace(/^"|"$/g, '');
+  try {
+    if (/\.iso$/i.test(src)) {
+      iso = src;
+      if (!OA.fileExists(iso)) { OA.say('  File not found: ' + iso); return false; }
+      OA.say('  Mounting the ISO...');
+      root = OA.mountIso(iso, tools);
+      if (!root) { OA.say('  Could not mount the ISO automatically. Mount it yourself (double-click on Windows 8 and newer, or with Daemon Tools) and give the drive letter instead.'); return false; }
+      OA.say('  Mounted as ' + root + ' (it is dismounted again when the check finishes).');
+    } else if (/\.wim$/i.test(src)) { wim = src; }
+    else if (/\.esd$/i.test(src)) { OA.say('  install.esd cannot be mounted read-only by DISM. Use media that has install.wim (the disc that came with the PC normally does).'); return false; }
+    else if (/^[A-Za-z]:?\\?$/.test(src)) { root = src.charAt(0).toUpperCase() + ':\\'; }
+    else if (OA.dirExists(src)) { root = src.replace(/[\\\/]+$/, '') + '\\'; }
+    else { OA.say('  Not recognised as an ISO, WIM, drive or folder: ' + src); return false; }
+    if (!wim) {
+      wim = root + 'sources\\install.wim';
+      if (!OA.fileExists(wim)) {
+        if (OA.fileExists(root + 'sources\\install.esd')) { OA.say('  This media has install.esd, which cannot be mounted read-only. Use media with install.wim.'); }
+        else { OA.say('  No sources\\install.wim found on ' + root); }
+        return false;
+      }
+    }
+    OA.say('  Reading the image list...');
+    list = OA.wimIndexes(wim);
+    if (!list.length) { OA.say('  DISM could not read ' + wim); return false; }
+    cmp = OA.compareWim(list);
+    OA.say('');
+    OA.say('  This PC : ' + cmp.installedText);
+    OA.say('  Media   : ' + cmp.mediaText);
+    OA.say('  Result  : ' + cmp.verdict);
+    if (cmp.level === 'arch') { OA.say('  ' + cmp.consequence); return false; }
+    if (cmp.level !== 'exact') {
+      OA.say('  If you continue: ' + cmp.consequence);
+      go = OA.yesno('The media does not match exactly. Continue anyway?', cmp.level !== 'build');
+      if (!go) { OA.say('  Baseline check cancelled; nothing was changed.'); return false; }
+    }
+    mnt = OA.expand('%TEMP%') + '\\oa-baseline-' + (new Date().getTime());
+    OA.mkdirp(mnt);
+    OA.say('  Mounting the image read-only (can take a minute or two)...');
+    r = OA.exec('dism /English /Mount-Image /ImageFile:"' + wim + '" /Index:' + cmp.idx + ' /MountDir:"' + mnt + '" /ReadOnly');
+    if (!OA.dirExists(mnt + '\\Windows')) { OA.say('  DISM could not mount the image:'); OA.say('  ' + OA.trim(r.out).split('\n').slice(-3).join('\n  ')); OA.cleanMount(mnt); return false; }
+    try { OA.loadBaseline(mnt, cmp, wim); }
+    finally { OA.cleanMount(mnt); }
+    OA.say('  Baseline ready: ' + OA.base.summary);
+    return true;
+  } finally { OA.unmountIso(); }
+};
+OA.cleanMount = function (mnt) {
+  var r = OA.exec('dism /English /Unmount-Image /MountDir:"' + mnt + '" /Discard'), fo;
+  try { fo = OA.fso.GetFolder(mnt); if (fo.Files.Count === 0 && fo.SubFolders.Count === 0) { OA.fso.DeleteFolder(mnt, true); } else { OA.say('  Note: the mount folder ' + mnt + ' is still in use. If it stays mounted run: dism /Cleanup-Wim'); } } catch (e) { }
 };
 OA.usage = function () {
   OA.say('OEM-Archiver ' + OA.version + '  - archives everything an OEM added to this Windows install.');
@@ -1575,6 +1785,7 @@ OA.usage = function () {
   OA.say('  /postsoftware:off  leave out software installed after OOBE');
   OA.say('  /hive              also read Default-user hive wallpaper/theme values (loads and unloads it)');
   OA.say('  /yes               accept defaults, no prompts    /noelevate       do not offer to run as administrator');
+  OA.say('  /baseline:<iso|install.wim|drive:>   verify against Windows install media (Vista+, administrator)');
   OA.say('  /classic           step-by-step prompts instead of the main menu     /nogui   no Windows message boxes');
   OA.say('Archive location: <chosen folder>\\OEM Archive\\<name>, unless the chosen folder is itself called');
   OA.say('"Archive" or "OEM Archive", in which case <chosen folder>\\<name> is used.');

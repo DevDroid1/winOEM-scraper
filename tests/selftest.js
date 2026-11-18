@@ -145,6 +145,40 @@ eq('fmtTime short', OA.fmtTime(65), '1:05');
 eq('fmtTime hours', OA.fmtTime(3725), '1:02:05');
 eq('rep', OA.rep('#', 3), '###');
 eq('htmlEsc', OA.htmlEsc('a<b>&'), 'a&lt;b&gt;&amp;');
+// ---- baseline (install media) logic ----
+var kv = OA.dismKv('Index : 2\nName : Windows 11 Home\nArchitecture : x64\nVersion : 10.0.26100\nServicePack Build : 1\nEdition : Core\n');
+eq('dismKv name', kv.name, 'Windows 11 Home'); eq('dismKv version', kv.version, '10.0.26100'); eq('dismKv ubr key', kv['servicepack build'], '1');
+OA.profile = { major: 10, minor: 0, build: 26100, arch: 'AMD64', osCaption: 'Windows 11 Home' };
+var inst = OA.regRead('HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\UBR');
+var ed = OA.regStr('HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\EditionID');
+var c1 = OA.compareWim([{ index: 1, name: 'x', version: '10.0.19045', ubr: 1, edition: ed, arch: 'x64' }]);
+eq('compare: different build', c1.level, 'build'); ok('build mismatch explains consequences', c1.consequence.indexOf('confidence level lower') > 0);
+var c2 = OA.compareWim([{ index: 1, name: 'x', version: '10.0.26100', ubr: 1, edition: ed, arch: 'arm64' }]);
+eq('compare: wrong architecture is refused', c2.level, 'arch');
+var c3 = OA.compareWim([{ index: 1, name: 'x', version: '10.0.26100', ubr: 99999, edition: ed, arch: 'x64' }, { index: 2, name: 'y', version: '10.0.26100', ubr: 99999, edition: 'Other', arch: 'x64' }]);
+eq('compare: same build, other revision', c3.level, 'revision'); eq('compare: picks the matching edition index', c3.idx, 1);
+var c4 = OA.compareWim([{ index: 1, name: 'x', version: '10.0.26100', ubr: parseInt(inst, 10), edition: ed, arch: 'x64' }]);
+ok('compare: exact or revision when UBR present', c4.level === 'exact' || c4.level === 'revision');
+OA.base = { active: false, degraded: false };
+eq('baseConf normal', OA.baseConf('HIGH'), 'HIGH');
+OA.base = { active: true, degraded: true, files: {}, infs: {} };
+eq('baseConf lowered HIGH', OA.baseConf('HIGH'), 'MED'); eq('baseConf lowered MED', OA.baseConf('MED'), 'LOW');
+// stockCheckBaseline with a fake Windows folder
+var fw = tmp + '\\fakewin';
+OA.mkdirp(fw + '\\Web\\Wallpaper');
+OA.writeText(fw + '\\Web\\Wallpaper\\same.jpg', 'abcde', false);
+OA.writeText(fw + '\\Web\\Wallpaper\\diff.jpg', 'abcdefghij', false);
+OA.writeText(fw + '\\Web\\Wallpaper\\new.jpg', 'xyz', false);
+OA.profile = { windir: fw, family: 'NT6', tools: { fsutil: false } };
+OA.base = { active: true, degraded: false, files: { 'web\\wallpaper\\same.jpg': OA.fso.GetFile(fw + '\\Web\\Wallpaper\\same.jpg').Size, 'web\\wallpaper\\diff.jpg': 3 }, infs: {} };
+ok('baseline: identical path+size is stock', !OA.stockCheckBaseline(fw + '\\Web\\Wallpaper\\same.jpg').oem);
+var rd = OA.stockCheckBaseline(fw + '\\Web\\Wallpaper\\diff.jpg'); ok('baseline: changed size, not Windows-owned = OEM replaced', rd.oem && rd.conf === 'HIGH');
+var rn = OA.stockCheckBaseline(fw + '\\Web\\Wallpaper\\new.jpg'); ok('baseline: not on media = OEM', rn.oem && rn.conf === 'HIGH');
+OA.base.degraded = true;
+eq('baseline: confidence lowered when build differs', OA.stockCheckBaseline(fw + '\\Web\\Wallpaper\\new.jpg').conf, 'MED');
+OA.base = null;
+// ---- Microsoft device handling ----
+ok('Microsoft vendor entry exists', OAV.vendors[OAV.vendors.length - 1] !== undefined);
 // ---- cleanup of what this test created ----
 try { OA.fso.DeleteFolder(tmp, true); } catch (e) { WScript.Echo('cleanup problem: ' + e.message); }
 

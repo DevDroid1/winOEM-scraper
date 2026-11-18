@@ -251,8 +251,9 @@ OA.main5 = function () {
   OA.say('This PC : ' + (P.makerRaw || '?') + ' / ' + (P.modelRaw || '?'));
   OA.say('Windows : ' + P.osCaption + ' ' + P.major + '.' + P.minor + '.' + P.build + (P.csd ? ' ' + P.csd : '') + '   ProductId channel: ' + P.channel);
   OA.say('Setup ref: ' + (P.oobeEnd ? OA.fmtDate(P.oobeEnd) + ' (' + P.oobeSrc + ')' : 'unknown') + '   Administrator: ' + (P.admin ? 'yes' : 'NO - log in as an administrator for complete results'));
-  tui = OA.useTui();
-  if (tui) { tr = OA.runTui(OA.collectors5); root = tr.root; base = tr.base; }
+  if (P.microsoftOem) { OA.say(''); OA.say('NOTE: this is a Microsoft device (e.g. Surface). Microsoft is both the OS vendor and the OEM, so publisher-based detection is switched off and results lean on the other signals (and the baseline check). Dedicated handling is planned.'); }
+  if (OA.args.baseline && OA.args.baseline !== true) { OA.setupBaseline(String(OA.args.baseline)); }
+  tui = OA.useTui();  if (tui) { tr = OA.runTui(OA.collectors5); root = tr.root; base = tr.base; }
   if (!OA.args.scan && !tui) {
     if (typeof OA.args.resume === 'string') { root = OA.args.resume.replace(/[\\\/]+$/, ''); base = root; OA.resuming = true; }
     else {

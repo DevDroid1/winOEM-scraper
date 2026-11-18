@@ -151,6 +151,11 @@ OA.col11 = function () {   // Drivers
         sub = 'PostDelivery-OEMVendor'; conf = 'MED';
         why = 'driver package ' + pub + ' published after OOBE; provider matches ' + rec.vendor;
       }
+      if (OA.base && OA.base.active) {
+        rec.baseline = (rec.orig && OA.base.infs[OA.lc(rec.orig)]) ? 'INF name also on media' : 'not on media';
+        if (sub && rec.baseline === 'not on media') { conf = OA.baseConf('HIGH'); why += '; not part of the install media'; }
+        else if (sub) { conf = OA.baseConf('MED'); why += '; the same INF name also ships on the install media (an OEM-supplied or newer version of a Windows driver)'; }
+      }
       if (sub) { rec.item = OA.addTree('11', folder, why, conf, { sub: sub, destRel: '11_Drivers\\' + sub + '\\' + pkg, era: rec.era }); }
       try { rec.size = rec.item ? rec.item.size : OA.fso.GetFolder(folder).Size; } catch (x) { }
     }
@@ -237,8 +242,9 @@ OA.main6 = function () {
   OA.say('This PC : ' + (P.makerRaw || '?') + ' / ' + (P.modelRaw || '?'));
   OA.say('Windows : ' + P.osCaption + ' ' + P.major + '.' + P.minor + '.' + P.build + (P.displayVersion ? ' (' + P.displayVersion + ')' : '') + '   ProductId channel: ' + P.channel);
   OA.say('OOBE end: ' + (P.oobeEnd ? OA.fmtDate(P.oobeEnd) + ' (' + P.oobeSrc + ')' : 'unknown') + '   Elevated: ' + (P.admin ? 'yes' : 'no'));
-  tui = OA.useTui();
-  if (tui) { tr = OA.runTui(OA.collectors6); root = tr.root; base = tr.base; }
+  if (P.microsoftOem) { OA.say(''); OA.say('NOTE: this is a Microsoft device (e.g. Surface). Microsoft is both the OS vendor and the OEM, so publisher-based detection is switched off and results lean on the other signals (and the baseline check). Dedicated handling is planned.'); }
+  if (OA.args.baseline && OA.args.baseline !== true) { OA.setupBaseline(String(OA.args.baseline)); }
+  tui = OA.useTui();  if (tui) { tr = OA.runTui(OA.collectors6); root = tr.root; base = tr.base; }
   if (!OA.args.scan && !tui) {
     if (typeof OA.args.resume === 'string') { root = OA.args.resume.replace(/[\\\/]+$/, ''); base = root; OA.resuming = true; }
     else {

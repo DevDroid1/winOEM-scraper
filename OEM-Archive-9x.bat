@@ -32,7 +32,7 @@ echo  OEM-Archiver 1.0.0  -  Windows 95 / 98 / ME edition
 echo  Copies what the PC maker added. Read-only on your system.
 echo ==============================================================
 echo.
-echo NOTICE: for best results, run this on a FRESH, factory-state install of the
+echo NOTICE: for best results, run this on a FRESH or recently installed copy of the
 echo OEM image (before the PC is used heavily or has other software installed).
 echo.
 if "%3"=="" pause
