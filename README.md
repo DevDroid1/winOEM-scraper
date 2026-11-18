@@ -133,7 +133,7 @@ Every flag is optional. Write them as `/flag` or `/flag:value` (quote values wit
 
 ```bat
 :: look only, save the list of everything found
-OEM-Archiver.bat /scan /list > scan.txt
+OEM-Archive.bat /scan /list > scan.txt
 
 :: see what preset 6 would do on a FAT32 stick, without writing anything
 OEM-Archive.bat /dryrun /preset:6 /out:E:\
