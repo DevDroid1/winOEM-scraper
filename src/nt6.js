@@ -226,6 +226,7 @@ OA.main6 = function () {
   if (OA.args.help || OA.args['?']) { OA.usage(); WScript.Quit(0); }
   OA.say('OEM-Archiver ' + OA.version + '  (Windows Vista - 11 edition, JScript)');
   OA.say('Archives everything the PC maker added on top of a retail Windows install. Read-only on the system.');
+  OA.debugInfo();
   OA.recommendations();
   OA.probeSystem(); P = OA.profile;
   if (P.family !== 'NT6' && !OA.args.ignoreos) {

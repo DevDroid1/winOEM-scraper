@@ -83,3 +83,10 @@ REFERENCE SHEETS (.oemref)
   Windows 2000/XP/2003 setup media (the i386 folder) can be read directly on ANY Windows (no DISM, no admin);
   it gives file NAMES only (no sizes), which is still useful for confidence. A sheet can be made from it too.
   Sheets contain only path, size and name lists, no hashes and no file contents.
+
+DEBUG
+  Add /debug to any edition (NT5/NT6). It prints the script engine (JScript/WSH version), host, bitness,
+  arguments, the parsed switches, the full system profile and tool list, then traces every command run,
+  every item added or dropped, every stock/OEM decision, every folder created, file copied or written, and
+  every error. A copy is saved as 00_Transcript\debug.log in the archive. The log contains paths, the PC
+  model and serial number, so review it before sharing.

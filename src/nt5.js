@@ -239,6 +239,7 @@ OA.main5 = function () {
   if (OA.args.help || OA.args['?']) { OA.usage(); WScript.Quit(0); }
   OA.say('OEM-Archiver ' + OA.version + '  (Windows 2000 / XP / 2003 edition, JScript)');
   OA.say('Archives everything the PC maker added on top of a retail Windows install. Read-only on the system.');
+  OA.debugInfo();
   OA.recommendations();
   OA.probeSystem(); P = OA.profile;
   if (P.family !== 'NT5' && !OA.args.ignoreos) {

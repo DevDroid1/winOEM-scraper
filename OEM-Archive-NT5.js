@@ -158,6 +158,7 @@ OA.err = function (where, e) {
   var m = '';
   try { m = (e && e.message) ? e.message : String(e); } catch (x) { m = 'error'; }
   OA.errors.push({ where: where, msg: m });
+  OA.dbg('ERROR ' + where + ': ' + m);
 };
 OA.expand = function (s) { return OA.sh.ExpandEnvironmentStrings(s); };
 OA.exists = function (p) { try { return OA.fso.FileExists(p) || OA.fso.FolderExists(p); } catch (e) { return false; } };
@@ -169,6 +170,7 @@ OA.mkdirp = function (p) {
   if (OA.fso.FolderExists(p)) { return true; }
   var par = OA.fso.GetParentFolderName(p);
   if (par && !OA.fso.FolderExists(par)) { OA.mkdirp(par); }
+  OA.dbg('create folder ' + p);
   OA.fso.CreateFolder(p);
   return true;
 };
@@ -179,6 +181,7 @@ OA.readText = function (p) {
 };
 OA.writeText = function (p, text, unicode) {
   OA.mkdirp(OA.fso.GetParentFolderName(p));
+  OA.dbg('write file ' + p + ' (' + String(text).length + ' chars, ' + (unicode ? 'UTF-16' : 'ANSI') + ')');
   var f = OA.fso.CreateTextFile(p, true, unicode ? true : false);
   f.Write(text);
   f.Close();
@@ -295,15 +298,19 @@ OA.relaunchElevated = function () {
 // ---------- command execution ----------
 OA.exec = function (cmd) {
   var p, out = '';
+  OA.dbg('exec: ' + cmd);
   try {
     p = OA.sh.Exec('cmd /s /c "' + cmd + ' 2>&1 <nul"');
     out = p.StdOut.ReadAll();
     while (p.Status === 0) { WScript.Sleep(15); }
+    OA.dbg('exec exit ' + p.ExitCode + ', ' + out.length + ' chars of output');
     return { code: p.ExitCode, out: out };
   } catch (e) { OA.err('exec ' + cmd, e); return { code: -1, out: '' }; }
 };
 OA.run = function (cmd) {
-  try { return OA.sh.Run('cmd /s /c "' + cmd + ' <nul"', 0, true); } catch (e) { OA.err('run ' + cmd, e); return -1; }
+  var rc;
+  OA.dbg('run: ' + cmd);
+  try { rc = OA.sh.Run('cmd /s /c "' + cmd + ' <nul"', 0, true); OA.dbg('run exit ' + rc); return rc; } catch (e) { OA.err('run ' + cmd, e); return -1; }
 };
 
 // ---------- registry (WMI StdRegProv for enumeration, WshShell for single reads) ----------
@@ -502,6 +509,7 @@ OA.probeSystem = function () {
   for (i = 0; i < t.length; i++) {
     P.tools[t[i]] = OA.fileExists(P.sys32 + '\\' + t[i] + '.exe') || (t[i] === 'regedit' && OA.fileExists(P.windir + '\\regedit.exe'));
   }
+  OA.debugProbe();
 };
 // Era of a file/record from its creation date relative to the end of OOBE
 OA.eraOf = function (d) {
@@ -639,6 +647,7 @@ OA.covered = function (src, cat) {
 OA.nothing = function (gid, what) {
   if (!OA.searched[gid]) { OA.searched[gid] = []; }
   OA.searched[gid].push(what);
+  OA.dbg('checked, nothing [' + gid + ']: ' + what);
 };
 OA.isNeverCopy = function (src) {
   var b = OA.lc(OA.leaf(src)), i;
@@ -661,6 +670,7 @@ OA.addFile = function (gid, src, why, conf, ex) {
   if (ex.era) { it.era = ex.era; }
   OA.seen[key] = true;
   OA.items.push(it);
+  OA.dbg('add file [' + gid + '][' + conf + '][' + (it.era || '-') + '] ' + src + ' (' + OA.fmtSize(it.size) + ') why: ' + why);
   if (it.size < 2097152 && /(unattend|sysprep|winbom|\$winnt\$|answer)[^\\]*\.(inf|xml|ini)$/i.test(src)) {
     if (/(ProductKey|AdminPassword|DomainAdminPassword|JoinPassword|<Password>)/i.test(OA.readText(src))) { OA.sensitive.push(src); }
   }
@@ -693,6 +703,7 @@ OA.addTree = function (gid, src, why, conf, ex) {
   OA.seen[key] = true;
   OA.treeRoots.push({ r: key, cat: cat });
   OA.items.push(it);
+  OA.dbg('add tree [' + gid + '][' + conf + '][' + (it.era || '-') + '] ' + src + ' (' + OA.fmtSize(it.size) + ') why: ' + why);
   return it;
 };
 OA.HKU = 2147483651;
@@ -709,12 +720,14 @@ OA.addReg = function (gid, full, name, why) {
          destRel: '00_Transcript\\registry\\' + OA.safeName(name, 80) + '.reg' };
   OA.seen[key] = true;
   OA.items.push(it);
+  OA.dbg('add registry export [' + gid + '] ' + full);
   return it;
 };
 OA.addNote = function (gid, name, text, why, conf) {
   var it = { kind: 'note', gid: gid, src: '(captured text) ' + name, size: String(text).length, why: why, conf: conf || 'HIGH', sub: '', cat: OA.groupById(gid).cat,
              status: '', note: '', era: '', text: text, destRel: OA.groupDir(gid) + '\\_info\\' + OA.safeName(name, 80) + '.txt' };
   OA.items.push(it);
+  OA.dbg('add note [' + gid + '] ' + name);
   return it;
 };
 OA.checkFile = function (gid, path, why, conf, ex) {
@@ -822,6 +835,7 @@ OA.scanStockDir = function (gid, dir, opts) {
     if (opts.skipRx && opts.skipRx.test(nm)) { return; }
     checked++;
     r = OA.stockCheck(f.Path);
+    OA.dbg('stock check ' + f.Path + ' -> ' + (r.oem ? 'OEM/non-stock' : 'stock') + ' (' + r.why + ')');
     if (r.oem && OA.addFile(gid, f.Path, (opts.why ? opts.why + ': ' : '') + r.why, opts.conf || r.conf, { sub: opts.sub })) { found++; }
   });
   if (!found) { OA.nothing(gid, 'no non-stock files in ' + dir + ' (' + checked + ' files checked)'); }
@@ -995,6 +1009,7 @@ OA.freeSpace = function (path) {
 OA.resuming = false;
 OA.copyFileSafe = function (src, dest) {
   var sd, dd, nm, rc;
+  OA.dbg('copy file ' + src + ' -> ' + dest);
   if (OA.resuming) {   // resume: keep a file that is already there with the same size
     try { if (OA.fso.FileExists(dest) && OA.fso.GetFile(dest).Size === OA.fso.GetFile(src).Size) { return { ok: true, note: 'already present (resume)' }; } } catch (e0) { }
   }
@@ -1013,6 +1028,7 @@ OA.copyFileSafe = function (src, dest) {
 OA.copyTree = function (it, destDir, capBytes) {
   var src = it.src, cmd, rc, files = [], tot = 0, bad = 0, skipped = 0, rel, d, ok, sz, copied = 0;
   it.files = [];
+  OA.dbg('copy tree ' + src + ' -> ' + destDir + (capBytes > 0 ? ' (cap ' + capBytes + ' bytes)' : ''));
   OA.mkdirp(destDir);
   if (capBytes > 0 && !OA.profile.tools.robocopy) {
     OA.walkFiles(src, true, function (f) {
@@ -1050,6 +1066,7 @@ OA.copyTree = function (it, destDir, capBytes) {
 };
 OA.exportReg = function (it, dest) {
   var key = it.src, rc, k2;
+  OA.dbg('export registry ' + key + ' -> ' + dest);
   OA.mkdirp(OA.fso.GetParentFolderName(dest));
   if (OA.profile.tools.reg) { rc = OA.run('reg export "' + key + '" "' + dest + '" /y'); }
   else if (OA.profile.tools.regedit) { k2 = key.replace(/^HKLM\\/i, 'HKEY_LOCAL_MACHINE\\').replace(/^HKCU\\/i, 'HKEY_CURRENT_USER\\').replace(/^HKU\\/i, 'HKEY_USERS\\'); rc = OA.run('regedit /e "' + dest + '" "' + k2 + '"'); }
@@ -1274,6 +1291,7 @@ OA.writeOutputs = function (root) {
   OA.writeText(t + '\\manifest.csv', OA.buildManifest(), true);
   OA.writeText(t + '\\skipped-and-errors.txt', OA.buildSkipped(), true);
   OA.writeText(t + '\\transcript.txt', OA.buildTranscript(root), true);
+  if (OA.args.debug) { OA.writeText(t + '\\debug.log', OA.dbgLog.join('\r\n'), true); }
   OA.writeText(t + '\\file-structure.txt', OA.buildFileStructure(root), true);   // last, so it shows every other output file
 };
 OA.printScanSummary = function () {
@@ -1489,7 +1507,7 @@ OA.progress = function (addBytes) {
   if (pct >= 3 && pct < 100) { eta = el * (100 - pct) / pct; }
   line = '[' + OA.rep('#', filled) + OA.rep('-', w - filled) + '] ' + pct + '%  ' + OA.fmtSize(p.done) + ' / ' + OA.fmtSize(p.total) + '  elapsed ' + OA.fmtTime(el) + (eta >= 0 ? '  about ' + OA.fmtTime(eta) + ' left' : '');
   while (line.length < 78) { line += ' '; }
-  OA.sayn('\r' + line);
+  OA.sayn((OA.args.debug ? '\n' : '\r') + line);
 };
 
 // ---------- dry run: what WOULD be copied with the current choices ----------
@@ -1954,6 +1972,46 @@ OA.setupBaseline = function (src) {
   var r = OA.exec('dism /English /Unmount-Image /MountDir:"' + mnt + '" /Discard'), fo;
   try { fo = OA.fso.GetFolder(mnt); if (fo.Files.Count === 0 && fo.SubFolders.Count === 0) { OA.fso.DeleteFolder(mnt, true); } else { OA.say('  Note: the mount folder ' + mnt + ' is still in use. If it stays mounted run: dism /Cleanup-Wim'); } } catch (e) { }
 };
+// ---------- /debug : trace of everything the script does ----------
+OA.dbgLog = [];
+OA.dbg = function (m) {
+  var d, line;
+  if (!OA.args || !OA.args.debug) { return; }
+  d = new Date();
+  line = '[debug ' + OA.pad(d.getHours(), 2) + ':' + OA.pad(d.getMinutes(), 2) + ':' + OA.pad(d.getSeconds(), 2) + '] ' + m;
+  OA.dbgLog.push(line);
+  try { WScript.StdOut.WriteLine(line); } catch (e) { }
+};
+OA.debugInfo = function () {
+  var a = WScript.Arguments, i, raw = [], vd = '?', env = OA.sh.Environment('Process'), tmpf;
+  if (!OA.args.debug) { return; }
+  for (i = 0; i < a.length; i++) { raw.push(String(a.Item(i))); }
+  try { vd = typeof OA.fso.GetFile(WScript.ScriptFullName).DateCreated; } catch (e) { }
+  OA.dbg('==== DEBUG MODE: every command, copy, write, scan decision and error is traced; a copy is saved as 00_Transcript\\debug.log ====');
+  OA.dbg('OEM-Archiver ' + OA.version + ' tier ' + (OA.tier || '?'));
+  OA.dbg('Script engine : ' + ScriptEngine() + ' ' + ScriptEngineMajorVersion() + '.' + ScriptEngineMinorVersion() + '.' + ScriptEngineBuildVersion());
+  OA.dbg('WSH version   : ' + WScript.Version + '  build ' + WScript.BuildVersion);
+  OA.dbg('Host          : ' + WScript.FullName);
+  OA.dbg('Script        : ' + WScript.ScriptFullName);
+  OA.dbg('Arguments     : ' + raw.join(' '));
+  OA.dbg('Parsed switches: ' + OA.dumpObj(OA.args));
+  OA.dbg('Current dir   : ' + OA.sh.CurrentDirectory);
+  OA.dbg('Process arch  : PROCESSOR_ARCHITECTURE=' + env('PROCESSOR_ARCHITECTURE') + '  PROCESSOR_ARCHITEW6432=' + env('PROCESSOR_ARCHITEW6432'));
+  OA.dbg('User / PC     : ' + env('USERNAME') + ' @ ' + env('COMPUTERNAME'));
+  OA.dbg('TEMP          : ' + OA.expand('%TEMP%'));
+  OA.dbg('COMSPEC       : ' + OA.expand('%COMSPEC%'));
+  OA.dbg('FSO date type : ' + vd + '  (typeof a file date: "date" values may be opaque VarDate on JScript 9+/11; OA.toDate converts them)');
+  OA.dbg('Regex/ES3 probe: non-capturing groups ' + (/(?:a)b/.test('ab') ? 'ok' : 'FAIL') + ', Array.indexOf ' + (typeof [].indexOf) + ', String.trim ' + (typeof ''.trim) + ', JSON ' + (typeof JSON));
+};
+OA.dumpObj = function (o) { var k, s = []; for (k in o) { s.push(k + '=' + o[k]); } return s.join(' '); };
+OA.debugProbe = function () {
+  var P = OA.profile, k, t = [];
+  if (!OA.args.debug) { return; }
+  for (k in P) { if (k === 'tools') { continue; } OA.dbg('profile.' + k + ' = ' + P[k]); }
+  for (k in P.tools) { t.push(k + '=' + (P.tools[k] ? 'yes' : 'no')); }
+  OA.dbg('profile.tools = ' + t.join(' '));
+  OA.dbg('vendor: short="' + OA.vendorShort + '" rx=' + (OA.vendorRx ? OA.vendorRx : 'none'));
+};
 OA.usage = function () {
   OA.say('OEM-Archiver ' + OA.version + '  - archives everything an OEM added to this Windows install.');
   OA.say('');
@@ -1967,6 +2025,7 @@ OA.usage = function () {
   OA.say('  /postdrivers       include post-delivery OEM drivers');
   OA.say('  /postsoftware:off  leave out software installed after OOBE');
   OA.say('  /hive              also read Default-user hive wallpaper/theme values (loads and unloads it)');
+  OA.say('  /debug             trace everything (engine versions, commands, copies, decisions); saved as debug.log');
   OA.say('  /yes               accept defaults, no prompts    /noelevate       do not offer to run as administrator');
   OA.say('  /baseline:<iso|install.wim|drive:|sheet.oemref>   verify against install media or a reference sheet');
   OA.say('  /makeref[:<folder|file>]   with /baseline: write a portable reference sheet (.oemref) and stop');
@@ -2216,6 +2275,7 @@ OA.main5 = function () {
   if (OA.args.help || OA.args['?']) { OA.usage(); WScript.Quit(0); }
   OA.say('OEM-Archiver ' + OA.version + '  (Windows 2000 / XP / 2003 edition, JScript)');
   OA.say('Archives everything the PC maker added on top of a retail Windows install. Read-only on the system.');
+  OA.debugInfo();
   OA.recommendations();
   OA.probeSystem(); P = OA.profile;
   if (P.family !== 'NT5' && !OA.args.ignoreos) {

@@ -140,6 +140,10 @@ OA.args = { yes: true }; ok('useTui off with /yes', !OA.useTui()); ok('useGui of
 OA.args = { classic: true }; ok('useTui off with /classic', !OA.useTui());
 OA.args = { nogui: true }; ok('useGui off with /nogui', !OA.useGui()); OA.args = {};
 eq('seven preset names', OA.presetNames.length, 7);
+// ---- debug flag ----
+OA.args = {}; OA.dbgLog = []; OA.dbg('silent'); eq('dbg is silent without /debug', OA.dbgLog.length, 0);
+OA.args = { debug: true }; OA.dbg('traced'); eq('dbg records with /debug', OA.dbgLog.length, 1); ok('dbg line has a timestamp', /^\[debug \d\d:\d\d:\d\d\] traced$/.test(OA.dbgLog[0]));
+OA.args = {}; OA.dbgLog = [];
 // ---- progress helpers ----
 eq('fmtTime short', OA.fmtTime(65), '1:05');
 eq('fmtTime hours', OA.fmtTime(3725), '1:02:05');
