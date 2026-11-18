@@ -1,0 +1,47 @@
+FULL FILE STRUCTURE
+===================
+
+PROJECT
+OEM-Archiver\
++-- OEM-Archive.bat          launcher: detects the Windows version and starts the right edition
++-- OEM-Archive-9x.bat       Windows 95/98/98SE/ME edition (plain batch)
++-- OEM-Archive-NT5.js       Windows 2000/XP/2003 edition (JScript, built from src\)
++-- OEM-Archive-NT6.js       Windows Vista-11 edition (JScript, built from src\)
++-- README.txt               usage, switches, privacy, limits
++-- STRUCTURE.txt            this file
++-- build.ps1                dev only: builds the two .js files from src\, fixes line endings
++-- src\
+|   +-- vendors.js           OEM vendor list, junk SMBIOS strings, staging-folder names
+|   +-- common.js            engine: console/menus/pages, registry+WMI, naming, location, scanning, copy, reports
+|   +-- nt5.js               2000/XP/2003 collectors + main
+|   \-- nt6.js               Vista-11 collectors + main
+\-- tests\
+    +-- run-tests.ps1        runs build, lint, selftest, launcher dispatch
+    +-- lint-es3.ps1         rejects syntax old JScript engines cannot parse
+    +-- selftest.js          unit checks of naming, nesting rule, presets, parsing
+    \-- launcher-dispatch.bat  checks every Windows version maps to the right script
+
+ARCHIVE OUTPUT   <chosen folder>\OEM Archive\<name>\   (or <chosen>\<name> if <chosen> is called Archive / OEM Archive)
++-- 00_Transcript\
+|   +-- transcript.txt           grouped by category: evidence + confidence per item, "checked, nothing found", summary
+|   +-- file-structure.txt       full tree of this archive with sizes (written last)
+|   +-- manifest.csv             every item: group, source, destination, size, dates, era, confidence, status
+|   +-- system-profile.txt       OS, maker/model, ProductId channel, OOBE time, tools, options chosen
+|   +-- skipped-and-errors.txt   denied, failed, over cap, excluded for privacy
+|   \-- registry\*.reg           exported OEM-related registry keys
++-- 01_Branding_SystemInfo\      OEMInformation / OEMINFO.INI, logo files
++-- 02_Boot_Logon_Lock\
++-- 03_Wallpapers\
++-- 04_Themes_VisualStyles\
++-- 05_Sounds\
++-- 06_Cursors_Icons_Screensavers\
++-- 07_Account_Pictures\
++-- 08_OOBE_Setup_Unattend\
++-- 09_StartMenu_Taskbar_Desktop\
++-- 10_Browser_Help_Support\
++-- 11_Drivers\                  driver-manifest.csv, Factory\, PostDelivery-OEMVendor\, Staged\
++-- 12_Software\                 software-manifest.csv, ProgramFolders\, StagedInstallers\
++-- 13_Recovery_Setup_Sources\
+\-- 14_Other\
+Group folders keep the original path, e.g. 03_Wallpapers\C\Windows\Web\Wallpaper\HP Backgrounds\...
+(9x edition writes text manifests and <group>\<leaf> folders instead of the CSV files.)
