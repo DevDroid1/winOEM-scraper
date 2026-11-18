@@ -64,7 +64,7 @@ PROGRESS, DRY RUN, RESUME, PACKAGING
   the folder in Explorer (/open). The built-in zip is slow and Windows zip cannot hold files over 4 GB.
 
 NOTICE
-  For best results run on a fresh or recently installed copy of the OEM image.
+  For best results run on a fresh or recently installed copy of Windows.
   Planned media options (verify against a disc, back up recovery media; see PLAN-next.txt) will show a
   warning when chosen: the media MUST be the same Windows edition AND build; use the disc that came with
   the PC if you have it.
@@ -73,3 +73,13 @@ MAIN MENU AND DIALOGS
   Started without switches, the NT editions open a main menu (Name, Location, Scan, Preset, Adjust, Dry
   run, Start copy) showing your current choices. Yes/No questions use real Windows message boxes; /nogui
   keeps them in the console, /classic uses the old step-by-step prompts.
+
+REFERENCE SHEETS (.oemref)
+  On a Vista-or-newer PC (administrator) run:  OEM-Archive.bat /baseline:<ISO | install.wim | drive:> /makeref
+  It checks the media against that PC's build, then writes OEM-Reference_<name>_<version>_<arch>.oemref next to
+  the script and stops. Copy the sheet to any other PC and use it there, XP included:
+      OEM-Archive.bat /baseline:<sheet.oemref>
+  The build/edition/architecture check runs again on the importing PC against the sheet's recorded build.
+  Windows 2000/XP/2003 setup media (the i386 folder) can be read directly on ANY Windows (no DISM, no admin);
+  it gives file NAMES only (no sizes), which is still useful for confidence. A sheet can be made from it too.
+  Sheets contain only path, size and name lists, no hashes and no file contents.

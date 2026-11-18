@@ -177,6 +177,30 @@ var rn = OA.stockCheckBaseline(fw + '\\Web\\Wallpaper\\new.jpg'); ok('baseline: 
 OA.base.degraded = true;
 eq('baseline: confidence lowered when build differs', OA.stockCheckBaseline(fw + '\\Web\\Wallpaper\\new.jpg').conf, 'MED');
 OA.base = null;
+// ---- reference sheet round trip (.oemref) ----
+OA.args = { yes: true };
+OA.profile = { major: 10, minor: 0, build: 26100, arch: 'AMD64', osCaption: 'Windows 11 Home', windir: fw, sys32: fw + '\\System32', family: 'NT6', tools: { fsutil: false } };
+var ubrNow = String(inst === null ? '0' : inst);
+var sheetB = { meta: { name: 'Windows 11 Home', version: '10.0.26100', ubr: ubrNow, edition: ed, arch: 'x64', sp: '' }, files: { 'web\\wallpaper\\same.jpg': 5 }, infs: { 'foo.inf': true }, names: { 'bar.exe': true } };
+var sheetFile = OA.writeRef(sheetB, tmp);
+ok('writeRef creates a .oemref file', /\.oemref$/i.test(sheetFile) && OA.fileExists(sheetFile));
+ok('baselineFromSheet imports it', OA.baselineFromSheet(sheetFile) === true && OA.base && OA.base.active);
+eq('sheet: file entry', OA.base.files['web\\wallpaper\\same.jpg'], 5); ok('sheet: inf entry', OA.base.infs['foo.inf'] === true); ok('sheet: name entry', OA.base.names['bar.exe'] === true);
+OA.writeText(tmp + '\\bad.oemref', 'nothing useful', true);
+ok('invalid sheet is rejected', OA.baselineFromSheet(tmp + '\\bad.oemref') === false);
+sheetB.meta.arch = 'arm64'; var armSheet = OA.writeRef(sheetB, tmp + '\\arm.oemref');
+ok('sheet for another architecture is refused', OA.baselineFromSheet(armSheet) === false);
+// name-only reference (XP-style): name on media = stock
+OA.base = { active: true, degraded: false, files: {}, infs: {}, names: { 'same.jpg': true } };
+ok('name-only reference marks a listed name as stock', !OA.stockCheckBaseline(fw + '\\Web\\Wallpaper\\same.jpg').oem);
+OA.base = null; OA.args = {};
+// I386 media reader with a fake media folder (any real exe stands in for winnt32.exe)
+var im = tmp + '\\media\\i386'; OA.mkdirp(im);
+OA.fso.CopyFile(OA.expand('%windir%') + '\\System32\\cmd.exe', im + '\\winnt32.exe', true);
+OA.writeText(im + '\\layout.inf', '[SourceDisksFiles]\r\nnotepad.exe = 1,,1\r\n"Long Name.bmp" = 1,,2\r\n', false);
+var bi = OA.loadI386(tmp + '\\media');
+ok('loadI386 reads the media', bi !== null && bi.names['notepad.exe'] === true && bi.names['long name.bmp'] === true);
+ok('loadI386 records version meta', bi !== null && /^\d+\.\d+\.\d+$/.test(bi.meta.version));
 // ---- Microsoft device handling ----
 ok('Microsoft vendor entry exists', OAV.vendors[OAV.vendors.length - 1] !== undefined);
 // ---- cleanup of what this test created ----
