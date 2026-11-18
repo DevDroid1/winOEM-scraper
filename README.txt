@@ -24,10 +24,16 @@ EDITIONS (OEM-Archive.bat picks the right one)
 PRESETS  1 Everything | 2 Branding + drivers + software list | 3 Branding only | 4 Drivers only |
          5 Software only | 6 FAT32-safe (skips files of 4 GB or more) | 7 Custom
 
-MAIN FLAGS  (full list with examples: docs\SWITCHES.md)
-  /scan look only   /dryrun show the plan   /resume continue an archive   /yes accept defaults
-  /out:<folder> /name:<text> /preset:1-7   /baseline:<media> verify against install media (docs\BASELINE.md)
-  /makeref write a reference sheet   /debug trace everything (debug.log)   /nogui /classic /noelevate /help
+FLAGS  (write /flag or /flag:value; full list with examples: docs\SWITCHES.md)
+  Run:      /yes accept defaults, no questions   /classic prompts instead of the menu   /nogui no message boxes
+            /noelevate no administrator relaunch /help
+  Look:     /scan detect only   /list print every item   /dryrun show what would be copied
+  Target:   /out:<folder>  /name:<text>  /resume  /resume:<archive folder>
+  Choose:   /preset:1-7  /branding:copy|skip  /drivers:full|manifest|skip  /software:all|manifest|skip
+            /cap:<MB> per-file limit  /totalcap:<GB> total limit  /postdrivers  /postsoftware:off  /hive
+  Finish:   /html  /zip  /open
+  Media:    /baseline:<iso|install.wim|drive:|sheet.oemref>  /makeref  (docs\BASELINE.md)
+  Diagnose: /debug (engine version + full trace, saved as debug.log)
 
 THE MEDIA MUST BE THE SAME WINDOWS EDITION AND BUILD as the PC for the baseline check; use the disc that came
 with the system if you have it. The build is checked first and the consequences are explained.

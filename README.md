@@ -43,7 +43,7 @@ OEM-Archive.bat /yes /out:D:\ /name:MyPC /preset:2 /noelevate
 | Vista / 7 / 8 / 8.1 / 10 / 11 | `OEM-Archive-NT6.js` | JScript via `cscript` |
 | NT 4.0 | not supported | |
 
-## Feature support by Windows version
+## Feature support by Windows version*
 
 | Feature | 95/98/ME | 2000 | XP/2003 | Vista/7 | 8/8.1 | 10/11 |
 |---|---|---|---|---|---|---|
@@ -62,9 +62,7 @@ OEM-Archive.bat /yes /out:D:\ /name:MyPC /preset:2 /noelevate
 | Zip / `index.html` at the end | no | no | zip yes | yes | yes | yes |
 | `/debug` trace | no | yes | yes | yes | yes | yes |
 
-> **Honest status:** tested only on Windows 11 (an HP OEM install), not elevated. The 2000/XP and 9x editions
-> have never been run on real old Windows, and the image mount, ISO mount, zip and message-box steps have not
-> been run live. See [Status and limits](#status-and-limits).
+<sub>\* **Status:** tested only on Windows 11 (an HP OEM install), not elevated. The 2000/XP and 9x editions have never been run on real old Windows, and the image mount, ISO mount, zip and message-box steps have not been run live. See [Status and limits](#status-and-limits).</sub>
 
 ## Main menu
 
@@ -106,7 +104,7 @@ an external drive, or a custom directory.
 
 ## Command-line flags explained
 
-Every flag is optional. The full guide with examples is in [docs/SWITCHES.md](docs/SWITCHES.md).
+Every flag is optional. Write them as `/flag` or `/flag:value` (quote values with spaces). Any of `/yes`, `/scan`, `/dryrun`, `/classic`, `/preset`, `/branding`, `/drivers`, `/software` skips the main menu. More detail and examples: [docs/SWITCHES.md](docs/SWITCHES.md).
 
 | Flag | What it does |
 |---|---|
@@ -130,6 +128,32 @@ Every flag is optional. The full guide with examples is in [docs/SWITCHES.md](do
 | `/makeref[:<folder\|file>]` | With `/baseline:` write a portable reference sheet and stop |
 | `/debug` | Print the script engine version and trace everything; saved as `debug.log` |
 | `/help` | Show the flag list |
+
+### Examples
+
+```bat
+:: look only, save the list of everything found
+OEM-Archiver.bat /scan /list > scan.txt
+
+:: see what preset 6 would do on a FAT32 stick, without writing anything
+OEM-Archive.bat /dryrun /preset:6 /out:E:\
+
+:: branding only, no questions, then open the result
+OEM-Archive.bat /yes /preset:3 /out:D:\ /name:MyPC /noelevate /open
+
+:: drivers as a list only, software skipped, files over 500 MB left out
+OEM-Archive.bat /yes /branding:copy /drivers:manifest /software:skip /cap:500 /out:D:\
+
+:: continue an interrupted run
+OEM-Archive.bat /resume:"D:\OEM Archive\MyPC" /preset:1
+
+:: verify against the Windows disc, then reuse the sheet on another PC
+OEM-Archive.bat /baseline:D: /makeref
+OEM-Archive.bat /baseline:OEM-Reference_Windows-11-Home_10.0.26100.1_x64_Core.oemref
+
+:: something odd? trace everything
+OEM-Archive.bat /debug
+```
 
 The 9x edition takes positional arguments instead: `OEM-Archive-9x.bat [base-folder] [name] [preset 1-5]`
 (use `.` for the script's own folder).
