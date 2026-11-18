@@ -169,8 +169,11 @@ OA.menu = function (title, options, defIdx) {
   }
 };
 OA.yesno = function (prompt, defYes) {
-  var a = OA.ask(prompt + ' (y/n)', defYes ? 'y' : 'n');
-  return /^y/i.test(a);
+  var r;
+  if (OA.useGui && OA.useGui()) {   // real Windows message box; falls back to the console if it cannot be shown
+    try { r = OA.sh.Popup(prompt, 0, 'OEM-Archiver', 4 + 32 + (defYes ? 0 : 256)); if (r === 6) { return true; } if (r === 7) { return false; } } catch (e) { }
+  }
+  return OA.yesnoConsole(prompt, defYes);
 };
 OA.pause = function () {
   try { OA.sayn('Press Enter to close...'); if (!WScript.StdIn.AtEndOfStream) { WScript.StdIn.ReadLine(); } } catch (e) { }
@@ -1365,13 +1368,10 @@ OA.addDesktopItems = function (dir, label) {
 // ---------- startup advice ----------
 OA.recommendations = function () {
   OA.say('');
-  OA.say('*** RECOMMENDED: run this on a FRESH, factory-state install of the OEM image ***');
-  OA.say('    (before the PC is used heavily, updated, or has other software installed).');
-  OA.say('    On a used system more items show up as "post-delivery" and some OEM files may');
-  OA.say('    already have been replaced or removed.');
-  OA.say('    If you verify against install media (baseline check): it MUST be the SAME');
-  OA.say('    Windows edition AND the SAME build as this PC. Use the disc that came with the');
-  OA.say('    system if you have it. Media of a different build gives wrong results.');
+  OA.say('NOTICE: for best results, run this on a FRESH, factory-state install of the OEM image');
+  OA.say('        (before the PC is used heavily, updated, or has other software installed).');
+  OA.say('        On a used system more items show up as "post-delivery" and some OEM files may');
+  OA.say('        already have been replaced or removed.');
   OA.say('');
   if (!OA.args.yes) { OA.ask('Press Enter to continue (Ctrl+C to cancel)', ''); }
 };
@@ -1477,6 +1477,90 @@ OA.finishOptions = function (root) {
   if (zip) { zp = OA.makeZip(root); if (zp) { OA.say('  Wrote ' + zp + '  (' + OA.fmtSize(OA.fso.GetFile(zp).Size) + ')'); } }
   if (OA.args.open || (!OA.args.yes && OA.yesno('Open the archive folder in Explorer now?', true))) { try { OA.sh.Run('explorer "' + root + '"', 1, false); } catch (e2) { } }
 };
+// ---------- native dialogs (yes/no via a real Windows message box) ----------
+// Works wherever Windows Script Host runs (98/ME/2000/XP/Vista-11). /nogui keeps everything in the console.
+OA.useGui = function () { return !OA.args.nogui && !OA.args.yes; };
+OA.yesnoConsole = function (prompt, defYes) { var a = OA.ask(prompt + ' (y/n)', defYes ? 'y' : 'n'); return /^y/i.test(a); };
+
+// ---------- warning shown ONLY when a media option (verify against disc / back up recovery media) is chosen ----------
+OA.mediaWarning = function () {
+  OA.say('');
+  OA.say('*** MEDIA WARNING ***');
+  OA.say('  Install/recovery media used for verification MUST be the SAME Windows edition AND the SAME build');
+  OA.say('  as this PC. Use the disc that came with the system if you have it. Media of a different build');
+  OA.say('  gives wrong results (stock files would look like OEM additions, or the reverse).');
+  return OA.yesno('Continue with the media option?', true);
+};
+
+// ---------- menu-based TUI ----------
+OA.presetNames = ['Everything', 'Branding + drivers, software manifest only', 'Branding only', 'Drivers only', 'Software only', 'FAT32-safe: everything, skipping files of 4 GB or more', 'Custom (go straight to the Adjust pages)'];
+OA.useTui = function () {
+  return !(OA.args.yes || OA.args.scan || OA.args.dryrun || OA.args.classic || OA.args.preset || OA.args.branding || OA.args.drivers || OA.args.software);
+};
+OA.resetScan = function () {
+  OA.items = []; OA.drivers = []; OA.software = []; OA.searched = {}; OA.excluded = []; OA.sensitive = []; OA.seen = {}; OA.treeRoots = []; OA.errors = [];
+};
+OA.tuiHeader = function (S) {
+  var P = OA.profile, sel, root = '';
+  if (S.base) { root = OA.resolveArchiveRoot(S.base, S.name); }
+  OA.say(''); OA.say(OA.rep('=', 70));
+  OA.say(' OEM-Archiver ' + OA.version + '   ' + (P.makerRaw || '?') + ' / ' + (P.modelRaw || '?') + '   ' + P.winName + (P.winSuffix ? ' ' + P.winSuffix : ''));
+  OA.say(OA.rep('-', 70));
+  OA.say(' Name     : ' + S.name);
+  OA.say(' Location : ' + (S.base ? S.base : '(not chosen yet)'));
+  if (root) { OA.say(' Archive  : ' + root); }
+  if (S.scanned) {
+    sel = OA.sum(function (it) { return OA.itemSelected(it); });
+    OA.say(' Scan     : done, ' + OA.items.length + ' items detected');
+    OA.say(' Choices  : ' + OA.modeText());
+    OA.say(' Selected : ' + sel.n + ' items, about ' + OA.fmtSize(OA.effectiveSize(sel.size)));
+  } else { OA.say(' Scan     : not done yet (choose 3)'); }
+  OA.say(OA.rep('=', 70));
+};
+OA.tuiScan = function (S, collectors) {
+  var r;
+  OA.resetScan();
+  if (S.base) { OA.excludeRoot = OA.lc(OA.resolveArchiveRoot(S.base, S.name)); }
+  OA.say(''); OA.say('Scanning (read-only)...');
+  OA.runCollectors(collectors);
+  OA.printScanSummary();
+  S.scanned = true;
+};
+OA.runTui = function (collectors) {
+  var S = { name: (OA.args.name && OA.args.name !== true) ? (OA.safeName(OA.args.name, 100) || OA.nameOptions()[0].value) : OA.nameOptions()[0].value, base: (OA.args.out && OA.args.out !== true) ? OA.args.out : '', scanned: false, presetSet: false }, c, def, labels, est, i, idx, root, free;
+  while (true) {
+    OA.tuiHeader(S);
+    def = !S.base ? 1 : (!S.scanned ? 2 : (!S.presetSet ? 3 : 6));
+    c = OA.menu('Main menu', ['Name', 'Location', 'Scan this PC', 'Preset (what to copy)', 'Adjust (branding / drivers / software / limits)', 'Dry run (show what would be copied)', 'Start copy', 'Quit'], def);
+    if (c === 0) { S.name = OA.chooseName(); if (S.scanned && S.base) { OA.excludeRoot = OA.lc(OA.resolveArchiveRoot(S.base, S.name)); } continue; }
+    if (c === 1) { S.base = OA.chooseLocation(); continue; }
+    if (c === 7) { OA.say('Quit. Nothing was copied.'); OA.finish(0); }
+    if (c === 2) { OA.tuiScan(S, collectors); continue; }
+    if (!S.scanned) { OA.say('  Scanning first (needed for sizes and choices)...'); OA.tuiScan(S, collectors); }
+    free = S.base ? OA.freeSpace(S.base) : -1;
+    if (c === 3) {
+      labels = [];
+      for (i = 1; i <= 7; i++) { est = (i < 7) ? OA.presetEstimate(i) : null; labels.push(OA.presetNames[i - 1] + (est ? '   est. ' + OA.fmtSize(OA.effectiveSize(est.size)) : '')); }
+      idx = OA.menu('Preset: what do you want to copy?', labels, 0);
+      OA.applyPreset(idx + 1); S.presetSet = true;
+      if (idx + 1 === 7) { OA.adjustPages(); }
+      continue;
+    }
+    if (c === 4) { OA.adjustPages(); S.presetSet = true; continue; }
+    if (c === 5) { OA.dryRunReport(); OA.ask('Press Enter to return to the menu', ''); continue; }
+    if (c === 6) {
+      if (!S.base) { OA.say('  Choose a location first (option 2).'); continue; }
+      root = OA.resolveArchiveRoot(S.base, S.name);
+      if (OA.dirExists(root)) {
+        if (OA.yesno('That archive folder already exists. Resume into it (files already copied are skipped)?', false)) { OA.resuming = true; }
+        else { root = OA.uniqueDir(root); }
+      }
+      OA.excludeRoot = OA.lc(root);
+      OA.say(''); OA.say((OA.resuming ? 'Resuming into: ' : 'Archive will be written to: ') + root);
+      if (OA.yesno('Start copying now?', true)) { return { root: root, base: S.base }; }
+    }
+  }
+};
 OA.usage = function () {
   OA.say('OEM-Archiver ' + OA.version + '  - archives everything an OEM added to this Windows install.');
   OA.say('');
@@ -1491,6 +1575,7 @@ OA.usage = function () {
   OA.say('  /postsoftware:off  leave out software installed after OOBE');
   OA.say('  /hive              also read Default-user hive wallpaper/theme values (loads and unloads it)');
   OA.say('  /yes               accept defaults, no prompts    /noelevate       do not offer to run as administrator');
+  OA.say('  /classic           step-by-step prompts instead of the main menu     /nogui   no Windows message boxes');
   OA.say('Archive location: <chosen folder>\\OEM Archive\\<name>, unless the chosen folder is itself called');
   OA.say('"Archive" or "OEM Archive", in which case <chosen folder>\\<name> is used.');
 };

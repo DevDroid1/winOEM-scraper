@@ -63,7 +63,13 @@ PROGRESS, DRY RUN, RESUME, PACKAGING
   At the end you can create index.html (summary + picture previews) and/or a .zip (/html /zip), then open
   the folder in Explorer (/open). The built-in zip is slow and Windows zip cannot hold files over 4 GB.
 
-RECOMMENDED USE
-  Run on a fresh, factory-state install of the OEM image. If you ever compare against install media (planned
-  baseline check, see PLAN-next.txt) it MUST be the same Windows edition AND build as the PC; use the disc
-  that came with the system if you have it.
+NOTICE
+  For best results run on a fresh, factory-state install of the OEM image.
+  Planned media options (verify against a disc, back up recovery media; see PLAN-next.txt) will show a
+  warning when chosen: the media MUST be the same Windows edition AND build; use the disc that came with
+  the PC if you have it.
+
+MAIN MENU AND DIALOGS
+  Started without switches, the NT editions open a main menu (Name, Location, Scan, Preset, Adjust, Dry
+  run, Start copy) showing your current choices. Yes/No questions use real Windows message boxes; /nogui
+  keeps them in the console, /classic uses the old step-by-step prompts.

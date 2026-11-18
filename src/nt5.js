@@ -234,7 +234,7 @@ OA.collectors5 = [
 
 // ---------- main ----------
 OA.main5 = function () {
-  var P, name, base, root, free = -1, sel, req;
+  var P, name, base, root, free = -1, sel, req, tui, tr;
   OA.ensureCscript(); OA.ensureNative(); OA.parseArgs();
   if (OA.args.help || OA.args['?']) { OA.usage(); WScript.Quit(0); }
   OA.say('OEM-Archiver ' + OA.version + '  (Windows 2000 / XP / 2003 edition, JScript)');
@@ -251,7 +251,9 @@ OA.main5 = function () {
   OA.say('This PC : ' + (P.makerRaw || '?') + ' / ' + (P.modelRaw || '?'));
   OA.say('Windows : ' + P.osCaption + ' ' + P.major + '.' + P.minor + '.' + P.build + (P.csd ? ' ' + P.csd : '') + '   ProductId channel: ' + P.channel);
   OA.say('Setup ref: ' + (P.oobeEnd ? OA.fmtDate(P.oobeEnd) + ' (' + P.oobeSrc + ')' : 'unknown') + '   Administrator: ' + (P.admin ? 'yes' : 'NO - log in as an administrator for complete results'));
-  if (!OA.args.scan) {
+  tui = OA.useTui();
+  if (tui) { tr = OA.runTui(OA.collectors5); root = tr.root; base = tr.base; }
+  if (!OA.args.scan && !tui) {
     if (typeof OA.args.resume === 'string') { root = OA.args.resume.replace(/[\\\/]+$/, ''); base = root; OA.resuming = true; }
     else {
       name = OA.chooseName();
@@ -265,14 +267,16 @@ OA.main5 = function () {
     OA.excludeRoot = OA.lc(root);
     OA.say(''); OA.say((OA.resuming ? 'Resuming into: ' : 'Archive will be written to: ') + root);
   }
-  OA.say(''); OA.say('Scanning (read-only)...');
-  OA.runCollectors(OA.collectors5);
-  OA.printScanSummary();
-  if (OA.args.list) { OA.printScanList(); }
+  if (!tui) {
+    OA.say(''); OA.say('Scanning (read-only)...');
+    OA.runCollectors(OA.collectors5);
+    OA.printScanSummary();
+    if (OA.args.list) { OA.printScanList(); }
+  }
   if (OA.args.scan) { OA.say(''); OA.say('Scan only: nothing was copied.'); OA.finish(0); }
   free = OA.freeSpace(base);
   if (OA.args.fakefree) { free = parseInt(OA.args.fakefree, 10) * 1048576; }   // test hook only
-  OA.selectionPages(free);
+  if (!tui) { OA.selectionPages(free); }
   if (OA.args.dryrun) { OA.dryRunReport(); OA.say(''); OA.say('Dry run: nothing was copied.'); OA.finish(0); }
   sel = OA.sum(function (it) { return OA.itemSelected(it); });
   req = OA.effectiveSize(sel.size);

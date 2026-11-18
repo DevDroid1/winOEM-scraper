@@ -134,6 +134,12 @@ OA.applyPreset(1); OA.modes.drivers = 'manifest'; eq('drivers manifest copies no
 OA.modes.drivers = 'skip'; OA.modes.software = 'skip'; eq('drivers+software skip leaves branding', count(), 2);
 OA.modes.branding = 'skip'; eq('everything skipped', count(), 0);
 
+// ---- TUI / dialogs helpers ----
+OA.args = {}; ok('useTui when interactive', OA.useTui());
+OA.args = { yes: true }; ok('useTui off with /yes', !OA.useTui()); ok('useGui off with /yes', !OA.useGui());
+OA.args = { classic: true }; ok('useTui off with /classic', !OA.useTui());
+OA.args = { nogui: true }; ok('useGui off with /nogui', !OA.useGui()); OA.args = {};
+eq('seven preset names', OA.presetNames.length, 7);
 // ---- progress helpers ----
 eq('fmtTime short', OA.fmtTime(65), '1:05');
 eq('fmtTime hours', OA.fmtTime(3725), '1:02:05');
